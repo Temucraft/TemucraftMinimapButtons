@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: |cffffcc00Temucraft|r Minimap Buttons
+## Notes: Puts the addon buttons from around the minimap into one grid that opens from a single minimap button. /tmb
+## Author: Temucraft
+## Version: 1.0.0
+## SavedVariables: TemucraftMinimapButtonsDB
+
+TemucraftMinimapButtons.lua
+Options.lua
