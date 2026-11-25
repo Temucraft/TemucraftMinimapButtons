@@ -73,6 +73,8 @@ function InterfaceOptions_AddCategory() end
 function InterfaceOptionsFrame_OpenToCategory() opened = opened + 1 end
 FauxScrollFrame_Update = function() end
 FauxScrollFrame_GetOffset = function() return 0 end
+local inCombat = false
+function InCombatLockdown() return inCombat end
 
 -- Blizzard frames that must stay
 local blizz = {}
@@ -196,6 +198,17 @@ local mb = TemucraftMinimapButtonsButton
 mb.scripts.OnDragStart(mb)
 mb.scripts.OnUpdate(mb, 0.1)
 ok(math.abs(db.angle - 90) < 0.01, "dragging sets the angle (" .. db.angle .. ")")
+
+-- a protected button found in combat is left on the minimap until a scan out of combat
+local secure = NewFrame("Button", "SecureThingButton", Minimap)
+secure.IsProtected = function() return true end
+secure:SetScript("OnClick", function() end)
+inCombat = true
+TemucraftMinimapButtons.Scan()
+ok(secure.parent == Minimap, "protected button not taken in combat")
+inCombat = false
+TemucraftMinimapButtons.Scan()
+ok(secure.parent ~= Minimap, "protected button taken after combat")
 
 print(fails == 0 and "ALL PASSED" or (fails .. " FAILED"))
 os.exit(fails == 0 and 0 or 1)

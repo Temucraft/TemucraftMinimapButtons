@@ -105,7 +105,8 @@ local function DropPools(list)
 	return out
 end
 
-local function FindCandidates()
+local libIcons -- LibDBIcon buttons found in _G (walking all of _G is slow: only at login and on a rescan)
+local function FindCandidates(full)
 	local list, added = {}, {}
 	local function add(f)
 		if IsCandidate(f) then
@@ -119,11 +120,17 @@ local function FindCandidates()
 		end
 	end
 	-- LibDBIcon buttons, even if an addon parented them somewhere else
-	for name, f in pairs(_G) do
-		if type(name) == "string" and name:find("^LibDBIcon10_") and type(f) == "table" and f.GetParent then
-			local p = f:GetParent()
-			if p == Minimap or p == MinimapBackdrop or p == MinimapCluster then add(f) end
+	if full or not libIcons then
+		libIcons = {}
+		for name, f in pairs(_G) do
+			if type(name) == "string" and name:find("^LibDBIcon10_") and type(f) == "table" and f.GetParent then
+				libIcons[#libIcons + 1] = f
+			end
 		end
+	end
+	for _, f in ipairs(libIcons) do
+		local p = f:GetParent()
+		if p == Minimap or p == MinimapBackdrop or p == MinimapCluster then add(f) end
 	end
 	return DropPools(list)
 end
@@ -235,11 +242,14 @@ local function AnchorGrid()
 	grid:SetPoint(v .. h, main, ov .. oh, 0, 0)
 end
 
-local function Scan()
-	for _, f in ipairs(FindCandidates()) do
+-- full: look through _G again for LibDBIcon buttons (login, rescan, options)
+local function Scan(full)
+	local combat = InCombatLockdown()
+	for _, f in ipairs(FindCandidates(full)) do
 		local name = f:GetName()
 		seen[name] = f
-		if not db.exclude[name] and not collected[name] then Capture(f) end
+		-- a protected button can't be re-parented in combat (ADDON_ACTION_BLOCKED): it's taken after combat
+		if not db.exclude[name] and not collected[name] and not (combat and f.IsProtected and f:IsProtected()) then Capture(f) end
 	end
 	TemucraftMinimapButtons_Layout()
 end
@@ -363,7 +373,7 @@ local API = TemucraftMinimapButtons
 
 function API.GetDB() return db end
 function API.Layout() TemucraftMinimapButtons_Layout() end
-function API.Scan() Scan() end
+function API.Scan() Scan(true) end
 function API.UpdateMainShown() UpdateMainShown() end
 function API.ShortName(name) return ShortName(name) end
 function API.IsCollected(name) return collected[name] ~= nil end
@@ -419,7 +429,7 @@ SlashCmdList.TEMUCRAFTMINIMAPBUTTONS = function(msg)
 	elseif cmd == "options" or cmd == "config" then
 		TemucraftMinimapButtons_OpenOptions()
 	elseif cmd == "rescan" or cmd == "scan" then
-		Scan()
+		Scan(true)
 		Print(#order .. " buttons collected.")
 	elseif cmd == "columns" or cmd == "cols" then
 		local n = tonumber(rest)
@@ -470,7 +480,7 @@ loader:SetScript("OnEvent", function(self, event, arg1)
 		CreateMain()
 		UpdateMainShown()
 		if TemucraftMinimapButtons_CreateOptions then TemucraftMinimapButtons_CreateOptions() end
-		Scan()
+		Scan(true)
 		-- addons that make their button late get picked up by later scans
 		pending = { 2, 6, 15 }
 		self.t = 0
@@ -478,7 +488,7 @@ loader:SetScript("OnEvent", function(self, event, arg1)
 			f.t = f.t + elapsed
 			if pending[1] and f.t >= pending[1] then
 				table.remove(pending, 1)
-				Scan()
+				Scan(true)
 			end
 			if not pending[1] then f:SetScript("OnUpdate", nil) end
 		end)
